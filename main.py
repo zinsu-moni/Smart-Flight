@@ -86,3 +86,21 @@ if __name__ == "__main__":
     except Exception as e:
         print("Run with: uvicorn main:create_app --reload")
         print("Error starting uvicorn:", e)
+
+
+# Many deployment platforms (including Vercel) expect a top-level ASGI `app`
+# variable. Provide one by trying to instantiate the FastAPI app. If FastAPI
+# (or other dependencies) are not available in the environment, fall back to a
+# minimal ASGI app that returns 503 so the import doesn't fail.
+try:
+    app = create_app()
+except Exception:
+    async def app(scope, receive, send):
+        # minimal ASGI fallback returning 503 for HTTP requests
+        if scope.get("type") == "http":
+            body = b"FastAPI not available; please install dependencies or run with uvicorn create_app()."
+            await send({"type": "http.response.start", "status": 503, "headers": [(b"content-type", b"text/plain; charset=utf-8")]})
+            await send({"type": "http.response.body", "body": body})
+        else:
+            # noop for non-http scopes
+            return
