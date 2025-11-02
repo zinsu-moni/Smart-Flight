@@ -1,0 +1,9 @@
+{
+  "agent_url": "http://127.0.0.1:8000/a2a/flight",
+  "provider_url": "https://api.flightapi.io/oneway",
+  "provider_api_key": "6907cf2e25c353dbd269e36f",
+  "default_origin": "ICN",
+  "default_destination": "LAX",
+  "default_date": "2025-12-01",
+  "default_adults": 1
+}

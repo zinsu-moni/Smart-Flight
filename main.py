@@ -54,22 +54,89 @@ def create_app():
             body = await request.json()
         except Exception:
             return JSONResponse(status_code=400, content={"error": "invalid json"})
-
-        # support either {query: {...}} or a raw dict
-        if isinstance(body, dict) and "query" in body:
-            query = body["query"]
-        else:
-            query = body
-
-        if flight_agent is None:
-            return JSONResponse(status_code=500, content={"error": "agent not available"})
-
+        # If the caller uses JSON-RPC (A2A) format, unwrap it and return JSON-RPC
         try:
-            # agent.process_messages expects a dict with a 'query' key in the scaffold
-            result = flight_agent.process_messages({"query": query})
-            return JSONResponse(status_code=200, content=result)
+            # JSON-RPC 2.0 wrapper
+            if isinstance(body, dict) and body.get("jsonrpc") == "2.0":
+                rpc_id = body.get("id")
+                method = body.get("method")
+
+                # extract messages depending on method
+                params = body.get("params") or {}
+                # default: try to find a message.parts[].data or a params.message
+                msg_obj = None
+                if method == "message/send":
+                    msg_obj = params.get("message")
+                elif method == "execute":
+                    msg_obj = params.get("messages")
+
+                # normalize parts list
+                parts = []
+                if isinstance(msg_obj, dict) and "parts" in msg_obj:
+                    parts = msg_obj.get("parts") or []
+                elif isinstance(msg_obj, list):
+                    # 'messages' could be a list of messages
+                    for m in msg_obj:
+                        if isinstance(m, dict) and "parts" in m:
+                            parts.extend(m.get("parts") or [])
+
+                # find the first data part and build a query
+                query = None
+                for p in parts:
+                    if not isinstance(p, dict):
+                        continue
+                    if p.get("kind") == "data":
+                        data = p.get("data") or {}
+                        # if data already contains a structured query, use it
+                        if isinstance(data, dict) and ("from" in data or "input" in data or "to" in data):
+                            query = data
+                            break
+
+                # fallback: if params contains direct fields
+                if query is None and isinstance(params, dict):
+                    if "query" in params and isinstance(params.get("query"), dict):
+                        query = params.get("query")
+                    else:
+                        # accept flat fields like input, from, to
+                        flat_keys = ("input", "from", "to", "date", "adults", "flight")
+                        q = {k: params.get(k) for k in flat_keys if k in params}
+                        if q:
+                            query = q
+
+                # if still no query, set to empty dict
+                if query is None:
+                    query = {}
+
+                if flight_agent is None:
+                    resp = {"jsonrpc": "2.0", "id": rpc_id, "error": {"code": -32000, "message": "agent not available"}}
+                    return JSONResponse(status_code=500, content=resp)
+
+                # call the agent with a consistent shape
+                try:
+                    result = flight_agent.process_messages({"query": query})
+                    rpc_resp = {"jsonrpc": "2.0", "id": rpc_id, "result": result}
+                    return JSONResponse(status_code=200, content=rpc_resp)
+                except Exception as e:
+                    rpc_err = {"jsonrpc": "2.0", "id": rpc_id, "error": {"code": -32603, "message": "Internal error", "data": str(e)}}
+                    return JSONResponse(status_code=500, content=rpc_err)
+
+            # support either {query: {...}} or a raw dict (non-RPC callers)
+            if isinstance(body, dict) and "query" in body:
+                query = body["query"]
+            else:
+                query = body
+
+            if flight_agent is None:
+                return JSONResponse(status_code=500, content={"error": "agent not available"})
+
+            try:
+                # agent.process_messages expects a dict with a 'query' key in the scaffold
+                result = flight_agent.process_messages({"query": query})
+                return JSONResponse(status_code=200, content=result)
+            except Exception as e:
+                return JSONResponse(status_code=500, content={"error": str(e)})
         except Exception as e:
-            return JSONResponse(status_code=500, content={"error": str(e)})
+            return JSONResponse(status_code=500, content={"error": "unexpected server error", "details": str(e)})
 
     @app.get("/health")
     def _health():

@@ -1,0 +1,8 @@
+{
+  "query": {
+    "from": "ICN",
+    "to": "LAX",
+    "date": "2025-12-01",
+    "adults": 1
+  }
+}
