@@ -105,16 +105,6 @@ except Exception:
             # noop for non-http scopes
             return
 
-    # Some deployment platforms expect an entrypoint named `handler` (Lambda-style).
-    # Export `handler` as an alias to the ASGI app so both `app` and `handler` are available.
-    try:
-        handler = app
-    except NameError:
-        # defensive: if app wasn't created for some reason, ensure handler exists as a noop
-        async def handler(scope, receive, send):
-            if scope.get("type") == "http":
-                body = b"Service unavailable"
-                await send({"type": "http.response.start", "status": 503, "headers": [(b"content-type", b"text/plain; charset=utf-8")]})
-                await send({"type": "http.response.body", "body": body})
-            else:
-                return
+# Export `handler` as an alias to the ASGI app so both `app` and `handler` are available
+# (some serverless platforms look for `handler` specifically).
+handler = app
