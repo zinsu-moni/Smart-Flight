@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Flight Agent UI</title>
+  <style>body{font-family:Arial,Helvetica,sans-serif;margin:20px}label{display:block;margin-top:8px}</style>
+</head>
+<body>
+  <h1>Flight Agent (scaffold)</h1>
+  <form id="form">
+    <label>Origin: <input name="origin" value="ICN"></label>
+    <label>Destination: <input name="destination" value="LAX"></label>
+    <label>Date: <input name="date" value="2025-12-01"></label>
+    <label>Adults: <input name="adults" type="number" value="1" min="1"></label>
+    <button type="submit">Find cheapest</button>
+  </form>
+
+  <pre id="out" style="background:#f7f7f8;padding:12px;border:1px solid #ddd;margin-top:12px;white-space:pre-wrap"></pre>
+
+  <script>
+    const form = document.getElementById('form');
+    const out = document.getElementById('out');
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const data = Object.fromEntries(new FormData(form).entries());
+      const payload = { query: { from: data.origin, to: data.destination, date: data.date, adults: Number(data.adults) } };
+      out.textContent = 'Request: ' + JSON.stringify(payload, null, 2) + '\n\n';
+
+      try {
+        const resp = await fetch('/a2a/flight', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+        const text = await resp.text();
+        out.textContent += 'Status: ' + resp.status + '\n\n' + text;
+      } catch (e) {
+        out.textContent += 'Fetch error: ' + e;
+      }
+    });
+  </script>
+</body>
+</html>
