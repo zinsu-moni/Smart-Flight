@@ -107,4 +107,11 @@ except Exception:
 
 # Export `handler` as an alias to the ASGI app so both `app` and `handler` are available
 # (some serverless platforms look for `handler` specifically).
-handler = app
+try:
+    # If Mangum is available, wrap the ASGI app into a Lambda-style handler which
+    # works well on many serverless platforms (including Vercel's Python runtime).
+    from mangum import Mangum
+    handler = Mangum(app)
+except Exception:
+    # fall back to exporting the ASGI app directly
+    handler = app
