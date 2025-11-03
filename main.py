@@ -98,7 +98,8 @@ def create_app():
                         query = params.get("query")
                     else:
                         # accept flat fields like input, from, to
-                        flat_keys = ("input", "from", "to", "date", "adults", "flight")
+                        # accept both 'to' and 'destination' so callers using that key are supported
+                        flat_keys = ("input", "from", "to", "destination", "date", "adults", "flight")
                         q = {k: params.get(k) for k in flat_keys if k in params}
                         if q:
                             query = q
